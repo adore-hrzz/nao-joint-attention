@@ -7,6 +7,7 @@
 
 #include <alproxies/almemoryproxy.h>
 #include <alproxies/alaudioplayerproxy.h>
+#include <alproxies/albehaviormanagerproxy.h>
 #include <althread/almutex.h>
 
 namespace AL
@@ -56,6 +57,11 @@ class Interface : public AL::ALModule
       * Resets the Interface module, subscribing back to FrontTactilTouched, enables new session
       */
     void endSession();
+
+    /**
+      * Method used to enable starting of the task
+      */
+    void enableTask(const std::string &IP, const int &port);
 
   private:
     /**

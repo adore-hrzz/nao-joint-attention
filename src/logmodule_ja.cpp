@@ -19,10 +19,19 @@
 struct Logger::Impl {
 
     /**
+      * IP and port of the remote NAOqi which is running on the other robot
+      */
+    std::string remoteIP;
+    int remotePort;
+
+    /**
       * Proxy to ALMemory
       */
     boost::shared_ptr<AL::ALMemoryProxy> memoryProxy;
-
+    /**
+      * Proxy to remote ALMemory (running on the other robot)
+      */
+    boost::shared_ptr<AL::ALMemoryProxy> memoryProxyRemote;
     /**
       * Module object
       */
@@ -63,12 +72,26 @@ struct Logger::Impl {
     int childCount;
 
     /**
+      * Function reading config file containing IP and port of the other robot
+      */
+    void readConfig(std::string& IP, int& port) {
+        // Open config file
+        std::ifstream config("/home/nao/naoqi/modules/config/remote.conf");
+        // Read IP and port
+        config >> IP >> port;
+        // Close
+        config.close();
+    }
+
+    /**
       * Struct constructor, initializes module instance and callback mutex
       */
     Impl(Logger &mod) : module(mod), fCallbackMutex(AL::ALMutex::createALMutex()) {
+        readConfig(remoteIP, remotePort);
         // Create proxy to ALMemory
         try {
             memoryProxy = boost::shared_ptr<AL::ALMemoryProxy>(new AL::ALMemoryProxy(mod.getParentBroker()));
+            memoryProxyRemote = boost::shared_ptr<AL::ALMemoryProxy>(new AL::ALMemoryProxy(remoteIP, remotePort));
         }
         catch (const AL::ALError& e) {
             qiLogError("Logger") << "Error creating proxy to ALMemory" << e.toString() << std::endl;
@@ -151,6 +174,21 @@ struct Logger::Impl {
         }
         catch (const AL::ALError& e) {
             qiLogError("Logger") << "Error unsubscribing from FaceDeteced" << e.toString() << std::endl;
+        }
+    }
+
+    /**
+      * Function used to run behaviors that should attract child's attention
+      */
+    void attractAttention(std::string action) {
+        if(action=="Sound") {
+            qiLogWarning("Logger") << "Attracting attention with sound" << std::endl;
+        }
+        else if(action=="LEDs") {
+            qiLogWarning("Logger") << "Attracting attention with LEDs" << std::endl;
+        }
+        else if(action=="Motion") {
+            qiLogWarning("Logger") << "Attracting attention with motion" << std::endl;
         }
     }
 
