@@ -15,7 +15,7 @@
 #include "logmodule_ja.hpp"
 
 
-#ifdef LOGGER_IS_REMOTE
+#ifdef LOGGER_JA_IS_REMOTE
 # define ALCALL
 #else
 # ifdef _WIN32
@@ -33,7 +33,7 @@ extern "C"
     // from the parent executable
     AL::ALBrokerManager::setInstance(pBroker->fBrokerManager.lock());
     AL::ALBrokerManager::getInstance()->addBroker(pBroker);
-      AL::ALModule::createModule<Logger>( pBroker, "Logger" );
+    AL::ALModule::createModule<Logger>( pBroker, "Logger" );
 
     return 0;
   }
@@ -44,7 +44,7 @@ extern "C"
   }
 }
 
-#ifdef LOGGER_IS_REMOTE
+#ifdef LOGGER_PR_IS_REMOTE
   int main(int argc, char *argv[])
   {
     // pointer to createModule
