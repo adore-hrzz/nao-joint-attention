@@ -67,11 +67,13 @@ struct Interface::Impl {
     /**
       * Function used to call and point to other robot
       */
-    void call(std::string filename) {
+    void call(std::string filename, bool gesture) {
         // Call by name (using unblocking call)
         //playerProxy->post.playFile(filename);
         // Run pointing behavior
-        //behaviorProxy->runBehavior("point");
+        //if( gesture ) {
+        //  behaviorProxy->runBehavior("point");
+        //}
         qiLogWarning("Interface") << "Calling" << std::endl;
     }
 
@@ -176,7 +178,7 @@ void Interface::callChild(const std::string &key, const AL::ALValue &value, cons
         // If event is raised with value 1, call child by name with pointing action towards other robot
         qiLogVerbose("Interface") << "Calling with name\n";
         // TODO: enable calling by uncommenting the following line
-        impl->call("home/nao/naoqi/sounds/name.wav");
+        impl->call("home/nao/naoqi/sounds/name.wav", false);
     }
     else if ( (int)value == 2 ) {
         // Event is raised with value 2, use special phrase

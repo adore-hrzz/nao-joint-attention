@@ -100,7 +100,7 @@ struct Logger::Impl {
         try {
             memoryProxy->declareEvent("CallChild", "Logger");
             memoryProxy->declareEvent("EndSession", "Logger");
-            memoryProxy->subscribeToEvent("StartSession", "Logger", "onStartLogger");
+            memoryProxyRemote->subscribeToEvent("StartSession", "Logger", "onStartLogger");
             childCount = 0;
         }
         catch (const AL::ALError& e) {
@@ -144,7 +144,7 @@ struct Logger::Impl {
         // Session is starting, subscribe to external events
         try {
             memoryProxy->subscribeToEvent("FaceDetected", "Logger", "onFaceDetected");
-            memoryProxy->subscribeToEvent("ChildCalled", "Logger", "onChildCalled");
+            memoryProxyRemote->subscribeToEvent("ChildCalled", "Logger", "onChildCalled");
             memoryProxy->subscribeToEvent("EndSession", "Logger", "onStopLogger");
         }
         catch (const AL::ALError& e) {
@@ -221,25 +221,46 @@ struct Logger::Impl {
 
                 // Check if five seconds have past from last call or last face appearance
                 if( sinceLastFace >= 5000 && sinceLastCall >= 5000){
-                    // For first three iterations
-                    if( iteration < 3 ) {
+                    // First iteration
+                    if( iteration < 1 ) {
                         // Log that the call should have started - CS = call started
                         log("CS", iteration+1);
                         // Reset face counter
                         faceCount = 0;
-                        // Raise event CallChild with value 1 meaning "Call by name"
+                        // Raise event CallChild with value 1 meaning "Vidi"
                         memoryProxy->raiseEvent("CallChild", AL::ALValue(1));
                         // Update the time of the last call
                         lastCall = boost::get_system_time();
                     }
-                    // Fourth iteration (iterations start from 0)
-                    else if( iteration == 3 ) {
+                    // Second and third iteration (iterations start from 0)
+                    else if( iteration < 3 ) {
                         // Log that the call using special phrase started - PS = phrase started
-                        log("PS", iteration);
+                        log("CS", iteration+1);
                         // Reset face counter
                         faceCount = 0;
-                        // Raise CallChild event with value 2 meaingn "Use special phrase"
+                        // Raise CallChild event with value 2 meaning "Vidi ovo!"
                         memoryProxy->raiseEvent("CallChild", AL::ALValue(2));
+                        // Update the time of the last call
+                        lastCall = boost::get_system_time();
+                    }
+                    // Fourth and fifth iteration
+                    else if( iteration < 5 ) {
+                        // Log that the call should have started - CS = call started
+                        log("CS", iteration+1);
+                        // Reset face counter
+                        faceCount = 0;
+                        // Raise event CallChild with value 3 meaning "Vidi ovo + gesta"
+                        memoryProxy->raiseEvent("CallChild", AL::ALValue(3));
+                        // Update the time of the last call
+                        lastCall = boost::get_system_time();
+                    }
+                    else if( iteration == 6 ) {
+                        // Log that the robot should be attracting attention
+                        log("AS", iteration+1);
+                        // Reset face counter
+                        faceCount = 0;
+                        // Raise event AttractAttention
+                        memoryProxy->raiseEvent("AttractAttention", AL::ALValue(1));
                         // Update the time of the last call
                         lastCall = boost::get_system_time();
                     }
@@ -324,20 +345,20 @@ void Logger::onStartLogger() {
     // Thread safety of the callback
     AL::ALCriticalSection section(impl->fCallbackMutex);
     // Unsubscribe from event, maybe this can be omitted
-    impl->memoryProxy->unsubscribeToEvent("StartSession", "Logger");
+    impl->memoryProxyRemote->unsubscribeToEvent("StartSession", "Logger");
 
     // Session is starting, initialize logger module and start scheduler thread
     impl->startLogger();
 
     // During the session this module must react to ChildCalled event
-    impl->memoryProxy->subscribeToEvent("ChildCalled", "Logger", "onChildCalled");
+    impl->memoryProxyRemote->subscribeToEvent("ChildCalled", "Logger", "onChildCalled");
 }
 
 void Logger::onStopLogger(const std::string &key, const AL::ALValue &value, const AL::ALValue &msg) {
     // Thread safety of the callback
     AL::ALCriticalSection section(impl->fCallbackMutex);
     // Unsubscriptions
-    impl->memoryProxy->unsubscribeToEvent("EndSession", "Logger");
+    impl->memoryProxyRemote->unsubscribeToEvent("EndSession", "Logger");
 
     // Interupt the execution of the scheduler thread
     impl->t->interrupt();
@@ -347,7 +368,7 @@ void Logger::onStopLogger(const std::string &key, const AL::ALValue &value, cons
     // Event subscription management
     try {
         impl->memoryProxy->unsubscribeToEvent("FaceDetected", "Logger");
-        impl->memoryProxy->subscribeToEvent("StartSession", "Logger", "onStartLogger");
+        impl->memoryProxyRemote->subscribeToEvent("StartSession", "Logger", "onStartLogger");
     }
     catch (const AL::ALError& e) {
         qiLogError("Logger") << "Error managing events" << e.toString() << std::endl;
@@ -364,7 +385,7 @@ void Logger::onChildCalled(const std::string &key, const AL::ALValue &value, con
     // Thread safety of the callback
     AL::ALCriticalSection section(impl->fCallbackMutex);
     // Unsubscription
-    impl->memoryProxy->unsubscribeToEvent("ChildCalled", "Logger");
+    impl->memoryProxyRemote->unsubscribeToEvent("ChildCalled", "Logger");
     // Update the time of the last call
     impl->lastCall = boost::get_system_time();
     // Increase iteration number
@@ -372,5 +393,5 @@ void Logger::onChildCalled(const std::string &key, const AL::ALValue &value, con
     // Log that the Interface module has ended the call
     impl->log("CE", (int)value);
     // Subscribe back to the same event
-    impl->memoryProxy->subscribeToEvent("ChildCalled", "Logger", "onChildCalled");
+    impl->memoryProxyRemote->subscribeToEvent("ChildCalled", "Logger", "onChildCalled");
 }
