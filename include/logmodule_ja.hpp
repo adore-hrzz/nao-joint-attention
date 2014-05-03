@@ -6,7 +6,7 @@
 #include <string>
 
 #include <alproxies/almemoryproxy.h>
-#include <alproxies/altexttospeechproxy.h>
+#include <alproxies/albehaviormanagerproxy.h>
 #include <althread/almutex.h>
 
 namespace AL
@@ -62,6 +62,12 @@ class Logger : public AL::ALModule
       * Iteration count will be updated
       */
     void onChildCalled(const std::string &key, const AL::ALValue &value, const AL::ALValue &msg);
+
+    /**
+      * This method will be called when SoundClassified event is raised
+      */
+    void onSoundClassified(const std::string &key, const AL::ALValue &value, const AL::ALValue &msg);
+
 
   private:
     /**

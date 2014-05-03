@@ -35,7 +35,8 @@ extern "C"
     // from the parent executable
     AL::ALBrokerManager::setInstance(pBroker->fBrokerManager.lock());
     AL::ALBrokerManager::getInstance()->addBroker(pBroker);
-      AL::ALModule::createModule<Interface>( pBroker, "Interface" );
+    //AL::ALBrokerManager::getInstance()->addBroker(AL::ALBrokerManager::getInstance()->getBrokerByIPPort("161.53.68.41", 9559));
+    AL::ALModule::createModule<Interface>( pBroker, "Interface" );
 
     return 0;
   }

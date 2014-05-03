@@ -24,6 +24,8 @@ struct Interface::Impl {
     std::string remoteIP;
     int remotePort;
 
+    boost::shared_ptr<AL::ALBroker> brokerToRemote;
+
     /**
       * Proxy to local ALMemory
       */
@@ -67,21 +69,31 @@ struct Interface::Impl {
     /**
       * Function used to call and point to other robot
       */
-    void call(std::string filename, bool gesture) {
+    void call(std::string filename, bool gesture, int value) {
         // Call by name (using unblocking call)
         //playerProxy->post.playFile(filename);
         // Run pointing behavior
-        //if( gesture ) {
-        //  behaviorProxy->runBehavior("point");
-        //}
-        qiLogWarning("Interface") << "Calling" << std::endl;
+        if( gesture ) {
+            playerProxy->post.playFile("/home/nao/naoqi/modules/sounds/phrase.wav");
+            behaviorProxy->runBehavior("arm_point");
+        }
+        else {
+            if( value == 1 ) {
+                playerProxy->post.playFile("/home/nao/naoqi/modules/sounds/name.wav");
+                behaviorProxy->runBehavior("head_turn");
+            }
+            else if( value == 2) {
+                playerProxy->post.playFile("/home/nao/naoqi/modules/sounds/phrase.wav");
+                behaviorProxy->runBehavior("head_turn");
+            }
+        }
+        qiLogWarning("Interface") << "Called" << std::endl;
     }
 
     /**
       * Struct constructor, initializes module instance and callback mutex
       */
     Impl(Interface &mod) : module(mod), fCallbackMutex(AL::ALMutex::createALMutex()) {
-
         // Create proxies
         try {
             memoryProxy = boost::shared_ptr<AL::ALMemoryProxy>(new AL::ALMemoryProxy(mod.getParentBroker()));
@@ -148,8 +160,9 @@ void Interface::onTactilTouched() {
     impl->memoryProxy->unsubscribeToEvent("FrontTactilTouched", "Interface");
     // Open connection to the other robot
     impl->readConfig(impl->remoteIP, impl->remotePort);
+
     try {
-       impl->memoryProxyRemote = boost::shared_ptr<AL::ALMemoryProxy>(new AL::ALMemoryProxy(impl->remoteIP, impl->remotePort));
+        impl->memoryProxyRemote = boost::shared_ptr<AL::ALMemoryProxy>(new AL::ALMemoryProxy(impl->remoteIP, impl->remotePort));
     }
     catch (const AL::ALError& e) {
         qiLogError("Interface") << "Error connecting to the other robot: " << e.toString() << std::endl;
@@ -165,6 +178,7 @@ void Interface::onTactilTouched() {
     }
     // Raise event that the session should start
     impl->memoryProxy->raiseEvent("StartSession", AL::ALValue(1));
+    qiLogWarning("Interface") << "Event StartSession raised\n";
 }
 
 void Interface::callChild(const std::string &key, const AL::ALValue &value, const AL::ALValue &msg) {
@@ -176,15 +190,21 @@ void Interface::callChild(const std::string &key, const AL::ALValue &value, cons
     // Reproduce the sound using ALAudioDevice proxy
     if( (int)value == 1 ) {
         // If event is raised with value 1, call child by name with pointing action towards other robot
-        qiLogVerbose("Interface") << "Calling with name\n";
-        // TODO: enable calling by uncommenting the following line
-        impl->call("home/nao/naoqi/sounds/name.wav", false);
+        qiLogFatal("Interface") << "Vidi!\n";
+        // First call without gesture
+        impl->call("home", false, 1);
     }
     else if ( (int)value == 2 ) {
-        // Event is raised with value 2, use special phrase
-        qiLogVerbose("Interface") << "Calling with special phrase\n";
-        // TODO: enable the player by uncommenting following line
-        //impl->playerProxy->playFile("home/nao/naoqi/sounds/phrase.wav");
+        // Event is raised with value 2, use reinforced phrase
+        qiLogFatal("Interface") << "Vidi ovo!\n";
+        // Use reinforced phrase without gesture
+        impl->call("home", false, 2);
+    }
+    else if( (int)value == 3 ) {
+        // Event is raised with value 3, use reinforced phrase with gesture
+        qiLogFatal("Interface") << "Vidi ovo + gesta!\n";
+        // Use reinforced phrase with gesture
+        impl->call("home", true, 3);
     }
     // Notify the Logger module that child was called
     impl->memoryProxy->raiseEvent("ChildCalled", value);

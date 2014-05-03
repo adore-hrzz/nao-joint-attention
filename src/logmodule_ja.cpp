@@ -33,6 +33,16 @@ struct Logger::Impl {
       */
     boost::shared_ptr<AL::ALMemoryProxy> memoryProxyRemote;
     /**
+      * Proxy to ALBehaviorManager used to run attention attracting behaviour
+      */
+    boost::shared_ptr<AL::ALBehaviorManagerProxy> behaviorProxy;
+
+    /**
+      * Proxy to sound classification module
+      */
+    boost::shared_ptr<AL::ALProxy> classificationProxy;
+
+    /**
       * Module object
       */
     Logger &module;
@@ -70,6 +80,7 @@ struct Logger::Impl {
     int iteration;
     int faceCount;
     int childCount;
+    bool callFinished;
 
     /**
       * Function reading config file containing IP and port of the other robot
@@ -91,6 +102,8 @@ struct Logger::Impl {
         // Create proxy to ALMemory
         try {
             memoryProxy = boost::shared_ptr<AL::ALMemoryProxy>(new AL::ALMemoryProxy(mod.getParentBroker()));
+            behaviorProxy = boost::shared_ptr<AL::ALBehaviorManagerProxy>(new AL::ALBehaviorManagerProxy(mod.getParentBroker()));
+            classificationProxy = boost::shared_ptr<AL::ALProxy>(new AL::ALProxy(mod.getParentBroker(), "KlasifikacijaGovora"));
             memoryProxyRemote = boost::shared_ptr<AL::ALMemoryProxy>(new AL::ALMemoryProxy(remoteIP, remotePort));
         }
         catch (const AL::ALError& e) {
@@ -102,6 +115,7 @@ struct Logger::Impl {
             memoryProxy->declareEvent("EndSession", "Logger");
             memoryProxyRemote->subscribeToEvent("StartSession", "Logger", "onStartLogger");
             childCount = 0;
+            callFinished = true;
         }
         catch (const AL::ALError& e) {
             qiLogError("Logger") << "Error setting up Logger" << e.toString() << std::endl;
@@ -130,8 +144,8 @@ struct Logger::Impl {
         // Open output file with timestamp
         boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
         std::stringstream filename;
-        filename << "/home/nao/naoqi/modules/" << now.date().year() << "_" << static_cast<int>(now.date().month())
-                 << "_" << now.date().day() << "_" <<  now.time_of_day().hours() << now.time_of_day().minutes() << "_log.txt";
+        filename << "/home/nao/naoqi/modules/logs/" << now.date().year() << "_" << static_cast<int>(now.date().month())
+                 << "_" << now.date().day() << "_" <<  now.time_of_day().hours() << now.time_of_day().minutes() << "_JointAttention.txt";
         outputFileLock.lock();
         outputFile.open(filename.str().c_str(), std::ios::out);
         outputFileLock.unlock();
@@ -146,6 +160,8 @@ struct Logger::Impl {
             memoryProxy->subscribeToEvent("FaceDetected", "Logger", "onFaceDetected");
             memoryProxyRemote->subscribeToEvent("ChildCalled", "Logger", "onChildCalled");
             memoryProxy->subscribeToEvent("EndSession", "Logger", "onStopLogger");
+            memoryProxy->subscribeToEvent("KlasifikacijaGovoraEvent", "Logger", "onSoundClassified");
+            classificationProxy->callVoid("pocniKlasifikaciju", 6000, 10, 3, 16000, AL::ALValue(3), 8192*2);
         }
         catch (const AL::ALError& e) {
             qiLogError("Logger") << "Error subscribing to events" << e.toString() << std::endl;
@@ -220,7 +236,11 @@ struct Logger::Impl {
                 long long sinceLastCall = timeDiff.total_milliseconds();
 
                 // Check if five seconds have past from last call or last face appearance
-                if( sinceLastFace >= 5000 && sinceLastCall >= 5000){
+                if( sinceLastFace >= 5000 && sinceLastCall >= 5000 && callFinished){
+                    // Reset call finished
+                    callFinished = false;
+                    // Stop sound classification
+                    classificationProxy->callVoid("prekiniKlasifikaciju");
                     // First iteration
                     if( iteration < 1 ) {
                         // Log that the call should have started - CS = call started
@@ -259,8 +279,11 @@ struct Logger::Impl {
                         log("AS", iteration+1);
                         // Reset face counter
                         faceCount = 0;
-                        // Raise event AttractAttention
-                        memoryProxy->raiseEvent("AttractAttention", AL::ALValue(1));
+                        // attract attention, TODO: implement behavior
+                        //behaviorProxy->runBehavior("SomeBehavior");
+                        qiLogWarning("Logger") << "Attracting attention" << std::endl;
+                        // update iteration
+                        iteration++;
                         // Update the time of the last call
                         lastCall = boost::get_system_time();
                     }
@@ -298,6 +321,9 @@ Logger::Logger(boost::shared_ptr<AL::ALBroker> pBroker, const std::string& pName
 
     functionName("onChildCalled", getName(), "Callback for ChildCalled event");
     BIND_METHOD(Logger::onChildCalled);
+
+    functionName("onSoundClassified", getName(), "Callback for ChildCalled event");
+    BIND_METHOD(Logger::onSoundClassified);
 }
 
 Logger::~Logger() {
@@ -358,7 +384,7 @@ void Logger::onStopLogger(const std::string &key, const AL::ALValue &value, cons
     // Thread safety of the callback
     AL::ALCriticalSection section(impl->fCallbackMutex);
     // Unsubscriptions
-    impl->memoryProxyRemote->unsubscribeToEvent("EndSession", "Logger");
+    impl->memoryProxy->unsubscribeToEvent("EndSession", "Logger");
 
     // Interupt the execution of the scheduler thread
     impl->t->interrupt();
@@ -369,6 +395,7 @@ void Logger::onStopLogger(const std::string &key, const AL::ALValue &value, cons
     try {
         impl->memoryProxy->unsubscribeToEvent("FaceDetected", "Logger");
         impl->memoryProxyRemote->subscribeToEvent("StartSession", "Logger", "onStartLogger");
+        impl->classificationProxy->callVoid("prekiniKlasifikaciju");
     }
     catch (const AL::ALError& e) {
         qiLogError("Logger") << "Error managing events" << e.toString() << std::endl;
@@ -392,6 +419,24 @@ void Logger::onChildCalled(const std::string &key, const AL::ALValue &value, con
     impl->iteration++;
     // Log that the Interface module has ended the call
     impl->log("CE", (int)value);
+    // restart sound classification
+    impl->classificationProxy->callVoid("pocniKlasifikaciju");
+    // Call is finished
+    impl->callFinished = true;
     // Subscribe back to the same event
     impl->memoryProxyRemote->subscribeToEvent("ChildCalled", "Logger", "onChildCalled");
+}
+
+void Logger::onSoundClassified(const std::string &key, const AL::ALValue &value, const AL::ALValue &msg) {
+    // Thread safety of the callback
+    AL::ALCriticalSection section(impl->fCallbackMutex);
+    // Unsubscription
+    impl->memoryProxy->unsubscribeToEvent("KlasifikacijaGovoraEvent", "Logger");
+    //qiLogWarning("Logger") << "Sound detected, reading value" << std::endl;
+    // Log that the sound classification module has detected sounds
+    std::string klasa = (std::string)value[0];
+    if(klasa=="Neartikulirano") impl->log("SC", 0);
+    else if( klasa=="Artikulirano") impl->log("SC", 1);
+    // Subscribe back to the same event
+    impl->memoryProxy->subscribeToEvent("KlasifikacijaGovoraEvent", "Logger", "onSoundClassified");
 }
