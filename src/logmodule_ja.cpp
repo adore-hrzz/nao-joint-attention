@@ -214,7 +214,7 @@ struct Logger::Impl {
     void operator()() {
         // In the start, initialize lastFace time
         lastFace = boost::get_system_time();
-
+https://gith
         // Start thread loop
         while( true ) {
 
