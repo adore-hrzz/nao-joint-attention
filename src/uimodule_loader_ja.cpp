@@ -36,7 +36,7 @@ extern "C"
     AL::ALBrokerManager::setInstance(pBroker->fBrokerManager.lock());
     AL::ALBrokerManager::getInstance()->addBroker(pBroker);
     //AL::ALBrokerManager::getInstance()->addBroker(AL::ALBrokerManager::getInstance()->getBrokerByIPPort("161.53.68.41", 9559));
-    AL::ALModule::createModule<Interface>( pBroker, "Interface" );
+    AL::ALModule::createModule<JointAttentionInterface>( pBroker, "JointAttentionInterface" );
 
     return 0;
   }
@@ -54,7 +54,7 @@ extern "C"
     TMainType sig;
     sig = &_createModule;
     // call main
-    ALTools::mainFunction("Interface", argc, argv, sig);
+    ALTools::mainFunction("JointAttentionInterface", argc, argv, sig);
   }
 #endif
 
